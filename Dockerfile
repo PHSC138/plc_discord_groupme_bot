@@ -19,7 +19,7 @@ COPY package-lock.json package.json ./
 RUN npm install
 
 # Copy all bot files to /home/${USER}
-COPY app.js token.js ./
+COPY app.js token.js avatar.png ./
 
 # Use the user created above
 USER ${USER}
