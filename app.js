@@ -31,17 +31,8 @@ discord_client.on("ready", () => {
 
 // Forward all messages from specified guild and channel to groupme
 discord_client.on("message", msg => {
-  let debug = false;
   // Confirm that it's the guild and channel set in token.js
-  // TODO: remove debug
   if (
-    msg.guild.id === tokens.discord_debug_guild ||
-    msg.channel.id === tokens.discord_debug_channel
-  ) {
-    log("Debug server");
-    debug = true;
-
-  } else if (
     msg.guild.id !== tokens.discord_guild_id ||
     msg.channel.id !== tokens.discord_channel_id
   ) {
@@ -55,21 +46,15 @@ discord_client.on("message", msg => {
     msg.member.nickname != null ? msg.member.nickname : msg.author.username;
 
   // Call function to send groupme message
-  send_groupme_message(author, msg.cleanContent, debug);
+  send_groupme_message(author, msg.cleanContent);
 });
 
-function send_groupme_message(author, message, debug) {
+function send_groupme_message(author, message) {
   // Create request body
   let body = {
     text: author + ": " + message,
     bot_id: tokens.groupme_bot_id
   };
-
-  // TODO: remove debug
-  if (debug){
-    log(body);
-    return;
-  }
 
   log("Discord --> Groupme '" + body.text + "'");
 
