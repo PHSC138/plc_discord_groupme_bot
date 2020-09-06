@@ -31,7 +31,10 @@ discord_client.on("ready", () => {
 // Forward all messages from specified guild and channel to Groupme
 discord_client.on("message", msg => {
   // Bot or empty message
-  if (msg.author.username === tokens.discord_username || msg.cleanContent.length <= 0) {
+  if (
+    msg.author.username === tokens.discord_username ||
+    msg.cleanContent.length <= 0
+  ) {
     return;
   }
 
@@ -56,7 +59,7 @@ discord_client.on("message", msg => {
     author = "Announcement";
   }
 
-  let message = author + ": " + msg.cleanContent;
+  let message = msg.cleanContent;
 
   // Get attachments
   let has_video = false;
@@ -91,33 +94,74 @@ discord_client.on("message", msg => {
   }
 
   // Call function to send Groupme message
-  send_groupme_message(message, groupme_attachments, has_video);
+  send_groupme_message(author, message, groupme_attachments, has_video);
 });
 
-function send_groupme_message(message, groupme_attachments, has_video) {
+function send_groupme_message(author, message, groupme_attachments, has_video) {
+  let video_message = "";
   if (has_video)
-    message +=
+    video_message =
       "\n(Tap the side of the video, then the 3 dots to view the video)";
-  // Create request body
-  let body = {
-    text: message,
-    bot_id: tokens.groupme_bot_id,
-    attachments: groupme_attachments
-  };
 
-  log(JSON.stringify(body));
-  log(message);
+  let message_bodies = [];
+  let message_index = 0;
+  let current_message_num = 1;
 
-  // Send the message to Groupme
-  request(
-    "https://api.groupme.com/v3/bots/post",
-    { method: "POST", body: body, json: true },
-    (err, res, body) => {
-      if (err) {
-        return log(err);
-      }
+  do {
+    // Get the max amount of text we can send in the message
+    // 6 is from " (d/d)"
+    // 2 is from ": "
+    let available_message_size = 450 - author.length - 6 - 2 - video_message.length;
+
+    // Check for out of bounds access
+    if (message_index + available_message_size > message.length) available_message_size = message.length - message_index;
+
+
+    // Craft message
+    let full_message = author + " (" + current_message_num + "/d): " + message.substring(message_index, message_index + available_message_size);
+    log("available_message_size: " + available_message_size.toString() + " " + typeof(available_message_size));
+
+    // Increment message_index
+    message_index += available_message_size;
+    current_message_num += 1;
+
+    // Create body
+    var body = {
+      text: full_message,
+      bot_id: tokens.groupme_bot_id,
+      attachments: groupme_attachments
     }
-  );
+
+    log(JSON.stringify(body));
+
+    message_bodies.push(body);
+
+    // Make sure not to send video or attachments with each part
+    video_message = "";
+    groupme_attachments = [];
+  }
+  while (message_index < message.length);
+
+  // For each body, send request to groupme
+  message_bodies.reverse().forEach(function(body) {
+    // If length of message_bodies is 1, remove (1/d)
+    // Else update "/d)" with current_message_num
+    if (message_bodies.length === 1) {
+      body.text = body.text.substring(0, author.length) + body.text.substring(author.length + 6, body.text.length);
+    } else {
+      body.text = body.text.substring(0, author.length + 4) + (current_message_num - 1).toString() + body.text.substring(author.length + 5, body.text.length);
+    }
+    // Send the message to Groupme
+    request(
+      "https://api.groupme.com/v3/bots/post",
+      { method: "POST", body: body, json: true },
+      (err, res, body) => {
+        if (err) {
+          return log(err);
+        }
+      }
+    );
+  });
 }
 
 discord_client.login(tokens.discord_token);
