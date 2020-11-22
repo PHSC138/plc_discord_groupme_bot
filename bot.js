@@ -30,11 +30,8 @@ discord_client.on("ready", () => {
 
 // Forward all messages from specified guild and channel to Groupme
 discord_client.on("message", msg => {
-  // Bot or empty message
-  if (
-    msg.author.username === tokens.discord_username ||
-    msg.cleanContent.length <= 0
-  ) {
+  // Bot
+  if (msg.author.username === tokens.discord_username) {
     return;
   }
 
@@ -111,18 +108,33 @@ function send_groupme_message(author, message, groupme_attachments, has_video) {
     // Get the max amount of text we can send in the message
     // 6 is from " (d/d)"
     // 2 is from ": "
-    let available_message_size = 450 - author.length - 6 - 2 - video_message.length;
+    let available_message_size =
+      450 - author.length - 6 - 2 - video_message.length;
 
-    // Check for out of bounds access
-    if (message_index + available_message_size > message.length) available_message_size = message.length - message_index;
+    // Check for out of bounds access -- just set to remaining length
+    if (message_index + available_message_size > message.length)
+      available_message_size = message.length - message_index;
 
+    // Snip message
+    let full_message =
+      author +
+      " (" +
+      current_message_num +
+      "/d): " +
+      message.substring(message_index, message_index + available_message_size);
 
-    // Craft message
-    let full_message = author + " (" + current_message_num + "/d): " + message.substring(message_index, message_index + available_message_size);
-    log("available_message_size: " + available_message_size.toString() + " " + typeof(available_message_size));
+    // Find last space, and snip again
+    full_message = full_message.substring(0, full_message.lastIndexOf(" "));
+
+    log(
+      "available_message_size: " +
+        available_message_size.toString() +
+        " " +
+        typeof available_message_size
+    );
 
     // Increment message_index
-    message_index += available_message_size;
+    message_index += full_message.length;
     current_message_num += 1;
 
     // Create body
@@ -130,7 +142,7 @@ function send_groupme_message(author, message, groupme_attachments, has_video) {
       text: full_message,
       bot_id: tokens.groupme_bot_id,
       attachments: groupme_attachments
-    }
+    };
 
     log(JSON.stringify(body));
 
@@ -139,17 +151,21 @@ function send_groupme_message(author, message, groupme_attachments, has_video) {
     // Make sure not to send video or attachments with each part
     video_message = "";
     groupme_attachments = [];
-  }
-  while (message_index < message.length);
+  } while (message_index < message.length);
 
   // For each body, send request to groupme
   message_bodies.reverse().forEach(function(body) {
     // If length of message_bodies is 1, remove (1/d)
     // Else update "/d)" with current_message_num
     if (message_bodies.length === 1) {
-      body.text = body.text.substring(0, author.length) + body.text.substring(author.length + 6, body.text.length);
+      body.text =
+        body.text.substring(0, author.length) +
+        body.text.substring(author.length + 6, body.text.length);
     } else {
-      body.text = body.text.substring(0, author.length + 4) + (current_message_num - 1).toString() + body.text.substring(author.length + 5, body.text.length);
+      body.text =
+        body.text.substring(0, author.length + 4) +
+        (current_message_num - 1).toString() +
+        body.text.substring(author.length + 5, body.text.length);
     }
     // Send the message to Groupme
     request(
