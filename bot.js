@@ -2,8 +2,8 @@ const tokens = require("./token.js"); // Store tokens in token.js
 const Discord = require("discord.js");
 const express = require("express");
 const body_parser = require("body-parser");
-const request = require("request");
 const fs = require("fs");
+const https = require("https");
 
 // Initialize file
 fs.writeFile("discord_groupme_bot.log", "Discord Groupme Bot Log", function(
@@ -91,10 +91,15 @@ discord_client.on("message", msg => {
   }
 
   // Call function to send Groupme message
-  send_groupme_message(author, message, groupme_attachments, has_video);
+  craft_groupme_message(author, message, groupme_attachments, has_video);
 });
 
-function send_groupme_message(author, message, groupme_attachments, has_video) {
+function craft_groupme_message(
+  author,
+  message,
+  groupme_attachments,
+  has_video
+) {
   let video_message = "";
   if (has_video)
     video_message =
@@ -108,24 +113,8 @@ function send_groupme_message(author, message, groupme_attachments, has_video) {
     // Get the max amount of text we can send in the message
     // 6 is from " (d/d)"
     // 2 is from ": "
-    let available_message_size =
-      450 - author.length - 6 - 2 - video_message.length;
-
-    // Check for out of bounds access -- just set to remaining length
-    if (message_index + available_message_size > message.length)
-      available_message_size = message.length - message_index;
-
-    // Snip message
-    let full_message =
-      author +
-      " (" +
-      current_message_num +
-      "/d): " +
-      message.substring(message_index, message_index + available_message_size);
-
-    // Find last space, and snip again
-    full_message = full_message.substring(0, full_message.lastIndexOf(" "));
-
+    const msg_constants = author.length + 6 + 2 + video_message.length;
+    let available_message_size = 450 - msg_constants;
     log(
       "available_message_size: " +
         available_message_size.toString() +
@@ -133,8 +122,42 @@ function send_groupme_message(author, message, groupme_attachments, has_video) {
         typeof available_message_size
     );
 
-    // Increment message_index
-    message_index += full_message.length;
+    // Check for out of bounds access -- just set to remaining length
+    if (message_index + available_message_size > message.length)
+      available_message_size = message.length - message_index;
+
+    let message_substring = message.substring(
+      message_index,
+      message_index + available_message_size
+    );
+    let new_length = available_message_size;
+
+    // Find last space, and last newline
+    const last_space = message_substring.lastIndexOf(" ");
+    const last_newline = message_substring.lastIndexOf("\n");
+    msg1 = message_substring.substring(0, last_space);
+    msg2 = message_substring.substring(0, last_newline);
+
+    // Split on bigger message
+    if (msg1.length > msg2.length && msg1.length !== message_substring.length) {
+      message_substring = msg1;
+      log("last_space: " + last_space.toString());
+      new_length = last_space + 1;
+    } else if (
+      msg1.length < msg2.length &&
+      msg2.length !== message_substring.length
+    ) {
+      message_substring = msg2;
+      log("last_newline: " + last_newline.toString());
+      new_length = last_newline + 1;
+    }
+
+    // Craft message
+    let full_message =
+      author + " (" + current_message_num + "/d): " + message_substring;
+
+    // Increment message_index and current_message_num
+    message_index += new_length;
     current_message_num += 1;
 
     // Create body
@@ -153,31 +176,52 @@ function send_groupme_message(author, message, groupme_attachments, has_video) {
     groupme_attachments = [];
   } while (message_index < message.length);
 
-  // For each body, send request to groupme
-  message_bodies.reverse().forEach(function(body) {
-    // If length of message_bodies is 1, remove (1/d)
-    // Else update "/d)" with current_message_num
-    if (message_bodies.length === 1) {
-      body.text =
-        body.text.substring(0, author.length) +
-        body.text.substring(author.length + 6, body.text.length);
-    } else {
-      body.text =
-        body.text.substring(0, author.length + 4) +
-        (current_message_num - 1).toString() +
-        body.text.substring(author.length + 5, body.text.length);
+  // Recursively calls itself until it finishes the list
+  send_groupme_message(message_bodies, 0, current_message_num - 1, author);
+}
+
+function send_groupme_message(message_bodies, index, num_messages, author) {
+  // Current body
+  const body = message_bodies[index];
+
+  // If length of message_bodies is 1, remove (1/d)
+  // Else update "/d)" with current_message_num
+  if (message_bodies.length === 1) {
+    body.text =
+      body.text.substring(0, author.length) +
+      body.text.substring(author.length + 6, body.text.length);
+  } else {
+    body.text =
+      body.text.substring(0, author.length + 4) +
+      num_messages.toString() +
+      body.text.substring(author.length + 5, body.text.length);
+  }
+  const str_body = JSON.stringify(body);
+  log("Message body: " + body.text);
+
+  // Send the message to Groupme
+  const options = {
+    hostname: "api.groupme.com",
+    port: 443,
+    path: "/v3/bots/post",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": str_body.length
     }
-    // Send the message to Groupme
-    request(
-      "https://api.groupme.com/v3/bots/post",
-      { method: "POST", body: body, json: true },
-      (err, res, body) => {
-        if (err) {
-          return log(err);
-        }
-      }
-    );
+  };
+
+  const req = https.request(options, res => {
+    log(`statusCode: ${res.statusCode}`);
+    if (index + 1 !== message_bodies.length) send_groupme_message(message_bodies, index + 1, num_messages, author);
   });
+
+  req.on("error", error => {
+    log(error);
+  });
+
+  req.write(JSON.stringify(body));
+  req.end();
 }
 
 discord_client.login(tokens.discord_token);
