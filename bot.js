@@ -122,9 +122,12 @@ function craft_groupme_message(
         typeof available_message_size
     );
 
+    let split = true;
     // Check for out of bounds access -- just set to remaining length
-    if (message_index + available_message_size > message.length)
+    if (message_index + available_message_size > message.length) {
       available_message_size = message.length - message_index;
+      split = false;
+    }
 
     let message_substring = message.substring(
       message_index,
@@ -139,11 +142,16 @@ function craft_groupme_message(
     msg2 = message_substring.substring(0, last_newline);
 
     // Split on bigger message
-    if (msg1.length > msg2.length && msg1.length !== message_substring.length) {
+    if (
+      split === true &&
+      msg1.length > msg2.length &&
+      msg1.length !== message_substring.length
+    ) {
       message_substring = msg1;
       log("last_space: " + last_space.toString());
       new_length = last_space + 1;
     } else if (
+      split === true &&
       msg1.length < msg2.length &&
       msg2.length !== message_substring.length
     ) {
@@ -213,7 +221,8 @@ function send_groupme_message(message_bodies, index, num_messages, author) {
 
   const req = https.request(options, res => {
     log(`statusCode: ${res.statusCode}`);
-    if (index + 1 !== message_bodies.length) send_groupme_message(message_bodies, index + 1, num_messages, author);
+    if (index + 1 !== message_bodies.length)
+      send_groupme_message(message_bodies, index + 1, num_messages, author);
   });
 
   req.on("error", error => {
