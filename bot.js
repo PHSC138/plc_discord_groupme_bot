@@ -204,6 +204,10 @@ function send_groupme_message(message_bodies, index, num_messages, author) {
       num_messages.toString() +
       body.text.substring(author.length + 5, body.text.length);
   }
+
+  // Escape unicode stuffs '’' (breaks groupme api)
+  body.text = body.text.replace(/[^\x00-\x7F]/g, "");
+
   const str_body = JSON.stringify(body);
   log("Message body: " + body.text);
 
@@ -220,17 +224,23 @@ function send_groupme_message(message_bodies, index, num_messages, author) {
   };
 
   const req = https.request(options, res => {
+    if (res.statusCode != 200 && res.statusCode != 202) {
+      log(res);
+    }
     log(`statusCode: ${res.statusCode}`);
-    if (index + 1 !== message_bodies.length)
-      send_groupme_message(message_bodies, index + 1, num_messages, author);
+    log(`options:\n${JSON.stringify(options, null, 2)}`);
+    log(`str_body:\n${str_body}`);
   });
 
   req.on("error", error => {
     log(error);
   });
 
-  req.write(JSON.stringify(body));
+  req.write(str_body);
   req.end();
+
+  if (index + 1 !== message_bodies.length)
+    send_groupme_message(message_bodies, index + 1, num_messages, author);
 }
 
 discord_client.login(tokens.discord_token);
