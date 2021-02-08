@@ -230,6 +230,8 @@ function send_groupme_message(message_bodies, index, num_messages, author) {
     log(`statusCode: ${res.statusCode}`);
     log(`options:\n${JSON.stringify(options, null, 2)}`);
     log(`str_body:\n${str_body}`);
+    if (index + 1 !== message_bodies.length)
+      send_groupme_message(message_bodies, index + 1, num_messages, author);
   });
 
   req.on("error", error => {
@@ -239,8 +241,6 @@ function send_groupme_message(message_bodies, index, num_messages, author) {
   req.write(str_body);
   req.end();
 
-  if (index + 1 !== message_bodies.length)
-    send_groupme_message(message_bodies, index + 1, num_messages, author);
 }
 
 discord_client.login(tokens.discord_token);
