@@ -1,10 +1,9 @@
 {
-  "name": "plc-discord-bot",
+  "name": "groupme-discord-bot",
   "version": "1.0.0",
   "description": "Connect groupme and discord",
   "main": "app.js",
   "scripts": {
-    "test": "node bot.js",
     "start": "node bot.js"
   },
   "repository": {

@@ -240,7 +240,6 @@ function send_groupme_message(message_bodies, index, num_messages, author) {
 
   req.write(str_body);
   req.end();
-
 }
 
 discord_client.login(tokens.discord_token);
@@ -287,6 +286,8 @@ express_app.post(tokens.groupme_callback_url, function(req, res) {
 });
 
 // Start listening on callback url
-express_app.listen(tokens.port, () => {
-  log(`Bot listening on ${tokens.port}, ${tokens.groupme_callback_url}`);
+// Use process.env.PORT for heroku
+const port = process.env.PORT || tokens.port;
+express_app.listen(port, () => {
+  log(`Bot listening on ${port}, ${tokens.groupme_callback_url}`);
 });

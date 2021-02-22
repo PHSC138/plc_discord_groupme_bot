@@ -4,7 +4,7 @@ debug: build stop debug_start
 
 HOST_PORT = 8000
 CONTAINER_PORT = 5000
-NAME = discord_bot-build-and-run
+NAME = groupme_discord_bot
 
 build: Dockerfile
 	docker build -t $(NAME) .
