@@ -4,7 +4,8 @@
   "description": "Connect groupme and discord",
   "main": "app.js",
   "scripts": {
-    "test": "node app.js"
+    "test": "node bot.js",
+    "start": "node bot.js"
   },
   "repository": {
     "type": "git",
