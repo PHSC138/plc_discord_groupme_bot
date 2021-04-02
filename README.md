@@ -12,11 +12,3 @@
 - The `groupme_callback_url` is the postfix to your link for the [https://dev.groupme.com/bots](https://dev.groupme.com/bots) callback url.
 - ex: you're hosting on https://www.mysite.com, the bot would be running on https://www.mysite.com:port/bot-callback
 
-## Heroku
-1. Create heroku account, install && setup heroku cli
-1. Pull repo && run `heroku create`
-1. `git add -A`
-1. `git commit -m "Off to heroku"`
-1. `git push heroku master`
-1. `heroku ps:scale web=1`
-1. `heroku open` will open the site, you should get the response `Cannot GET /`
