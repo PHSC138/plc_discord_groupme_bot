@@ -1,6 +1,6 @@
 all: build
-run: build stop prod_start
-debug: build stop debug_start
+run: build prod_start
+debug: build debug_start
 
 HOST_PORT = 8000
 CONTAINER_PORT = 5000
