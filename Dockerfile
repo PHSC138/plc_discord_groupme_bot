@@ -1,9 +1,5 @@
-# /Dockerfile
-# From alpine
-FROM alpine:3.11.6
-
-# Add nodejs and npm
-RUN apk add --update --no-cache nodejs npm
+# Use node alpine build
+FROM node:18-alpine3.15
 
 # Add user
 ARG USER=discord_bot
