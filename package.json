@@ -1,8 +1,8 @@
 {
-  "name": "groupme-discord-bot",
-  "version": "1.0.0",
-  "description": "Connect groupme and discord",
-  "main": "app.js",
+  "name": "plc-discord-bot",
+  "version": "1.0.1",
+  "description": "Connect PLC Groupme and Discord messaging platforms",
+  "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
   },
@@ -13,8 +13,10 @@
   "author": "PHSC138",
   "license": "ISC",
   "dependencies": {
+    "@discordjs/rest": "^0.4.1",
     "body-parser": "^1.19.0",
-    "discord.js": "^12.5.0",
+    "discord-api-types": "^0.32.1",
+    "discord.js": "^13.7.0",
     "express": "^4.17.1"
   }
 }
