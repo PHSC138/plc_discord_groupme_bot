@@ -6,14 +6,15 @@ const fs = require("fs");
 const https = require("https");
 
 // Initialize file
-fs.writeFile("discord_groupme_bot.log", "Discord Groupme Bot Log", function(
-  err,
-  data
-) {
-  if (err) {
-    return log(err);
+fs.writeFile(
+  "discord_groupme_bot.log",
+  "Discord Groupme Bot Log",
+  function (err, data) {
+    if (err) {
+      return log(err);
+    }
   }
-});
+);
 
 // Log to console and file
 function log(message) {
@@ -22,14 +23,16 @@ function log(message) {
 }
 
 // Discord
-const discord_client = new Discord.Client();
+const discord_client = new Discord.Client({
+  intents: [Discord.Intents.FLAGS.GUILDS, Discord.Intents.FLAGS.GUILD_MESSAGES],
+});
 
 discord_client.on("ready", () => {
   log(`Logged in as ${discord_client.user.tag}!`);
 });
 
 // Forward all messages from specified guild and channel to Groupme
-discord_client.on("message", msg => {
+discord_client.on("message", (msg) => {
   // Bot
   if (msg.author.username === tokens.discord_username) {
     return;
@@ -59,30 +62,36 @@ discord_client.on("message", msg => {
   let message = msg.cleanContent;
 
   // Get attachments
-  let has_video = false;
-  let attachments = msg.attachments.array();
+  log(msg);
+  let attachments = Array.from(msg.attachments);
+  log(attachments);
   let groupme_attachments = [];
   for (let i = 0; i < attachments.length; i++) {
-    let url = attachments[i].url;
-    let substr = url.substring(url.length - 3, url.length);
+    // not sure if this is the guild number or channel
+    let guild_or_channel = attachments[i][0];
+    let message_attachment = attachments[i][1];
+
+    // URL needs to be uploaded to groupme to send as an attachment, just send as a link
+    let url = message_attachment.url;
+    let type = message_attachment.contentType;
     let image = true;
     if (
-      substr == "mp4" ||
-      substr == "m4v" ||
-      substr == "mov" ||
-      substr == "avi" ||
-      substr == "wmv"
+      type.includes("mp4") ||
+      type.includes("m4v") ||
+      type.includes("mov") ||
+      type.includes("avi") ||
+      type.includes("wmv")
     )
       image = false;
 
     let attachment = {
-      url: attachments[i].url
+      url: url,
     };
 
     if (image) {
       attachment.type = "image";
+      attachment.preview_url = attachments[i].proxyURL;
     } else {
-      has_video = true;
       attachment.type = "video";
       attachment.preview_url = attachments[i].proxyURL;
     }
@@ -91,20 +100,10 @@ discord_client.on("message", msg => {
   }
 
   // Call function to send Groupme message
-  craft_groupme_message(author, message, groupme_attachments, has_video);
+  craft_groupme_message(author, message, groupme_attachments);
 });
 
-function craft_groupme_message(
-  author,
-  message,
-  groupme_attachments,
-  has_video
-) {
-  let video_message = "";
-  if (has_video)
-    video_message =
-      "\n(Tap the side of the video, then the 3 dots to view the video)";
-
+function craft_groupme_message(author, message, groupme_attachments) {
   let message_bodies = [];
   let message_index = 0;
   let current_message_num = 1;
@@ -113,14 +112,17 @@ function craft_groupme_message(
     // Get the max amount of text we can send in the message
     // 6 is from " (d/d)"
     // 2 is from ": "
-    const msg_constants = author.length + 6 + 2 + video_message.length;
+    const msg_constants = author.length + 6 + 2;
     let available_message_size = 450 - msg_constants;
     log(
       "available_message_size: " +
         available_message_size.toString() +
-        " " +
-        typeof available_message_size
+        " message size: " +
+        message.length.toString()
     );
+
+    // Check for empty message
+    if (message.length == 0) continue;
 
     let split = true;
     // Check for out of bounds access -- just set to remaining length
@@ -172,17 +174,48 @@ function craft_groupme_message(
     var body = {
       text: full_message,
       bot_id: tokens.groupme_bot_id,
-      attachments: groupme_attachments
     };
 
     log(JSON.stringify(body));
 
     message_bodies.push(body);
-
-    // Make sure not to send video or attachments with each part
-    video_message = "";
-    groupme_attachments = [];
   } while (message_index < message.length);
+
+  // Push attachments as a link
+  let full_message = author + " (" + current_message_num + "/d): ";
+  let send = true;
+
+  for (let i = 0; i < groupme_attachments.length; i++) {
+    let attachment = groupme_attachments[i];
+    console.log(attachment);
+
+    if (
+      full_message.length + attachment.url.length <
+      450 - (author.length + 2)
+    ) {
+      full_message += attachment.url + " ";
+      log("Added attachment.url to full_message: " + full_message);
+
+      // Continue to keep adding attachments
+      send = false;
+    } else {
+      send = true;
+    }
+
+    if (send || i == groupme_attachments.length - 1) {
+      // Create body
+      var body = {
+        text: full_message,
+        bot_id: tokens.groupme_bot_id,
+      };
+
+      log(JSON.stringify(body));
+      message_bodies.push(body);
+
+      current_message_num += 1;
+      full_message = author + " (" + current_message_num + "/d): ";
+    }
+  }
 
   // Recursively calls itself until it finishes the list
   send_groupme_message(message_bodies, 0, current_message_num - 1, author);
@@ -191,6 +224,12 @@ function craft_groupme_message(
 function send_groupme_message(message_bodies, index, num_messages, author) {
   // Current body
   const body = message_bodies[index];
+  log(
+    "Current send_groupme_message body: " +
+      body.text +
+      " at index: " +
+      index.toString()
+  );
 
   // If length of message_bodies is 1, remove (1/d)
   // Else update "/d)" with current_message_num
@@ -219,11 +258,11 @@ function send_groupme_message(message_bodies, index, num_messages, author) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Content-Length": str_body.length
-    }
+      "Content-Length": str_body.length,
+    },
   };
 
-  const req = https.request(options, res => {
+  const req = https.request(options, (res) => {
     if (res.statusCode != 200 && res.statusCode != 202) {
       log(res);
     }
@@ -234,7 +273,7 @@ function send_groupme_message(message_bodies, index, num_messages, author) {
       send_groupme_message(message_bodies, index + 1, num_messages, author);
   });
 
-  req.on("error", error => {
+  req.on("error", (error) => {
     log(error);
   });
 
@@ -249,12 +288,12 @@ const express_app = express();
 express_app.use(body_parser.json());
 
 // Groupme avatar
-express_app.get(tokens.groupme_avatar_url, function(req, res) {
+express_app.get(tokens.groupme_avatar_url, function (req, res) {
   res.sendFile(__dirname + "/avatar.png");
 });
 
 // Groupme callback
-express_app.post(tokens.groupme_callback_url, function(req, res) {
+express_app.post(tokens.groupme_callback_url, function (req, res) {
   log("Groupme --> Discord");
   log("req.body");
   log(JSON.stringify(req.body));
